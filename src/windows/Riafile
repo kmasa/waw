@@ -1,0 +1,51 @@
+require "shellwords"
+
+cmd "install", opt: "[distro=Ubuntu]" do |distro:| # 作成済み親の install を WSL へ委譲
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-e", "-lc",
+     'exec ria --riafile "$HOME/.waw/waw/src/wsl/Riafile" install', no_cmd_c: true
+end
+cmd "status", opt: "[distro=Ubuntu]" do |distro:| # WSL の読み取り専用診断
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw status", no_cmd_c: true
+end
+
+cmd "herdr", opt: "[distro=Ubuntu]" do |*args, distro:| # Herdr のタブ作成を WSL 経由で Incus へ委譲
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw herdr #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "bash", opt: "[distro=Ubuntu]" do |*args, distro:| # 環境選択・ID 指定で入室。引数を WSL へ渡す
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw bash #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "new", opt: "[distro=Ubuntu]" do |*args, distro:| # 親に Git project を作る。引数を WSL へ渡す
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw new #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "add", opt: "[distro=Ubuntu]" do |*args, distro:| # 親に URL を clone。引数を WSL へ渡す
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw add #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "drop", opt: "[distro=Ubuntu]" do |*args, distro:| # 指定した子を破棄して削除
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw drop #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "list", opt: "[distro=Ubuntu]" do |*args, distro:| # 所有環境を一覧表示
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw list #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "temp", opt: "[distro=Ubuntu]" do |*args, distro:| # 一時 fork 先で実行・終了時 drop
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw temp #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end
+
+cmd "fork", opt: "[distro=Ubuntu]" do |*args, distro:| # 現在の環境を分岐。引数を WSL へ渡す
+  raise "Windows 上で実行してください" unless windows?
+  sh "wsl.exe", "-d", distro, "--exec", "bash", "-lc", "exec waw fork #{args.map { Shellwords.escape(_1) }.join(' ')}", no_cmd_c: true
+end

@@ -1,0 +1,11 @@
+cwd "../" do
+  ria "status"
+  ria "herdr"
+  ria "bash"
+  ria "new"
+  ria "add"
+  ria "drop"
+  ria "list"
+  ria "temp"
+  ria "fork"
+end

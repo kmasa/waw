@@ -1,0 +1,17 @@
+require "rbconfig"
+
+cmd "herdr" do # 現在地で Herdr のタブを作る。WSL / Windows へは委譲しない
+  sh "herdr", "tab", "create", "--cwd", ENV.fetch("RIA_PWD")
+end
+cmd("new") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "new", *args, abort: false } # 親に Git project を作る
+cmd("add") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "add", *args, abort: false } # 親に URL を clone。引数なしの分岐はしない
+cmd("fork") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "fork", *args, abort: false } # 現在の環境から子を作って留まる。--bash なら子へ入室
+cmd("bash") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "bash", *args, abort: false } # 環境選択・ID 指定で入室。exit は環境を残して退室
+cmd "done", opt: "[keep|--keep]" do |*args, keep:| # 対象成果を大元 waw へ提出・帰還。keep / --keep なら提出元を削除しない
+  raise "done [--keep]" unless args.empty?
+  exit sh "ria", "--riafile", "../Riafile", "local", "done", *(["--keep"] if keep), abort: false
+end
+cmd("drop") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "drop", *args, abort: false } # 未提出・未コミット変更も破棄して削除。ID 省略は現在の子
+cmd("list") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "list", *args, abort: false } # 所有環境の状態・一時/残存・複製元を一覧表示
+cmd("temp") { |*args| exec RbConfig.ruby, $PROGRAM_NAME, "--riafile", "../Riafile", "local", "temp", *args } # fork 先でコマンド実行。終了・割込み後は drop
+cmd("pwsh") { |*args| exit sh "ria", "--riafile", "../Riafile", "local", "pwsh", *args, abort: false } # 現在地の UNC で Windows pwsh（なければ powershell）。引数はそのまま渡す

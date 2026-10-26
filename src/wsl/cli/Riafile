@@ -1,0 +1,14 @@
+require "rbconfig"
+require "json"
+
+cwd "../" do
+  ria "status"
+end
+cmd("herdr") { |*args| sh "ria", "--riafile", "../Riafile", "local", "herdr", *args } # Herdr のタブ作成を Incus へ委譲
+cmd("bash") { |*args| sh "ria", "--riafile", "../Riafile", "local", "bash", *args } # 環境選択・ID 指定で入室
+cmd("new") { |*args| sh "ria", "--riafile", "../Riafile", "local", "new", *args } # 親に Git project を作る
+cmd("add") { |*args| sh "ria", "--riafile", "../Riafile", "local", "add", *args } # 親に URL を clone。引数なしの分岐はしない
+cmd("drop") { |*args| sh "ria", "--riafile", "../Riafile", "local", "drop", *args } # 指定した子を破棄して削除。大元・依存環境は保護
+cmd("list") { |*args| sh "ria", "--riafile", "../Riafile", "local", "list", *args } # 所有環境の状態・一時/残存・複製元を一覧表示
+cmd("temp") { |*args| exec({ 'WAW_TEMP_ARGS' => JSON.generate(args) }, RbConfig.ruby, $PROGRAM_NAME, "--riafile", "../Riafile", "local", "temp") } # 大元から一時 fork してコマンド実行・終了時 drop
+cmd("fork") { |*args| sh "ria", "--riafile", "../Riafile", "local", "fork", *args } # 現在の環境を分岐。--bash なら子へ入室

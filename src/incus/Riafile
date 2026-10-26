@@ -1,0 +1,65 @@
+require "json"
+require "socket"
+
+cmd install: "ria --riafile2cmd cli/Riafile waw" # guest の通常 CLI 入口を生成
+cmd "setup" do # Ubuntu 親の共有 /root に mise / Node / 公式 Pi / Herdr を不足時だけ導入。Pi の日常更新は pi update
+  sh "bash", "-euo", "pipefail", "-c", <<~'SH'
+    . /etc/os-release; test "$ID" = ubuntu
+    test "$(id -u)" = 0
+    findmnt -rn -M /root -O rw >/dev/null
+    export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+    if ! command -v mise >/dev/null; then curl -fsSL https://mise.run | sh; fi
+    if ! mise which node >/dev/null 2>&1; then mise use -g node@lts; fi
+    mise reshim
+    # Pi 自体は mise / npm global 管理にしない。
+    if ! command -v pi >/dev/null; then curl -fsSL https://pi.dev/install.sh | sh; fi
+    if ! command -v herdr >/dev/null; then curl -fsSL https://herdr.dev/install.sh | sh; fi
+    profile='export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"'
+    grep -qxF "$profile" /root/.profile || printf '\n%s\n' "$profile" >> /root/.profile
+    activation='eval "$(mise activate bash)"'
+    grep -qxF "$activation" /root/.bashrc || printf '\n%s\n' "$activation" >> /root/.bashrc
+    command -v node; mise which node; node --version
+    command -v pi; readlink -f "$(command -v pi)"; pi --version
+    command -v herdr; herdr --version
+  SH
+end
+
+cmd "local" do |operation, *args| # 通常 CLI の要求送信。実処理は入室元の WSL Riafile
+  sock = Socket.new(:UNIX, :SEQPACKET, 0)
+  begin
+    sock.connect(Socket.sockaddr_un(ENV.fetch("WAW_SOCKET")))
+    input = operation == 'temp' ? [Socket::AncillaryData.unix_rights($stdin, $stdout, $stderr)] : ($stdin.stat.file? ? [Socket::AncillaryData.unix_rights($stdin)] : [])
+    sock.sendmsg(JSON.generate("op" => operation, "args" => args, "cwd" => ENV.fetch("RIA_PWD")), 0, nil, *input)
+    signals = {}
+    if operation == 'temp'
+      %w[INT TERM HUP].each { |signal| signals[signal] = Signal.trap(signal) { sock.sendmsg(JSON.generate('signal' => signal)) rescue nil } }
+    end
+    loop do
+      data, = sock.recvmsg(65536)
+      raise "WSL supervisor との接続が切れました。資源とログを確認してください" if data.empty?
+      reply = JSON.parse(data)
+      puts reply["message"] if reply["message"]
+      if reply["choices"]
+        reply.fetch("choices").each_with_index { |id, i| puts "#{i + 1}: #{id}" }
+        print "環境 [waw]: "; $stdout.flush
+        selected = `bash -c 'IFS= read -r id; printf "%s" "$id"'`.strip
+        raise "選択番号が範囲外です" if selected.match?(/\A\d+\z/) && !(1..reply.fetch("choices").size).cover?(Integer(selected))
+        chosen = selected.empty? ? "waw" : (selected.match?(/\A\d+\z/) ? reply.fetch("choices").fetch(Integer(selected).pred) : selected)
+        sock.sendmsg(JSON.generate("id" => chosen))
+        next
+      end
+      if reply["socket"]
+        sh "socat", "-t0", ($stdin.tty? ? "STDIO,cfmakeraw" : "STDIO,ignoreeof"), "UNIX-CONNECT:#{reply.fetch('socket')}"
+        next
+      end
+      next if reply["status"] == "progress"
+      raise reply.fetch("reason", "host 操作失敗") unless reply["status"] == "succeeded"
+      exit reply.fetch('exit_code') if reply.key?('exit_code')
+      exit 200 if reply["transition"] # supervisor が shell の終了を待って遷移する
+      break
+    end
+  ensure
+    signals&.each { |signal, handler| Signal.trap(signal, handler) }
+    sock.close
+  end
+end
